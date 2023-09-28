@@ -177,6 +177,7 @@ class MinesweeperAI():
             sentence.mark_safe(cell)
 
     def add_knowledge(self, cell, count):
+        print("add_knowledge")
         """
         Called when the Minesweeper board tells us, for a given
         safe cell, how many neighboring cells have mines in them.
@@ -192,7 +193,60 @@ class MinesweeperAI():
                if they can be inferred from existing knowledge
         """ 
         self.moves_made.add(cell)
+        self.mark_safe(cell)
+
+        # start new sentence
+        newSentenceCells = set()
+
+        for i in range(cell[0] - 1, cell[0] + 2):
+            for j in range(cell[1] - 1, cell[1] + 2):
+                if 0 <= i < self.height and 0 <= j < self.width and (i,j) != cell:
+                    if (i,j) in self.mines:
+                        count -= 1
+                    elif (i,j) not in self.safes:
+                        newSentenceCells.add((i,j))
         
+        newSentence = Sentence(newSentenceCells, count)
+        self.knowledge.append(newSentence)
+
+        # mark additional cells as safe or mines based on any of the sentences
+        newMines = set()
+        newSafes = set()
+
+        for sentence in self.knowledge:
+            for mine in sentence.known_mines():
+                if mine not in self.mines:
+                    newMines.add(mine)
+            for safe in sentence.known_safes():
+                if safe not in self.safes:
+                    newSafes.add(safe)
+
+        for mine in newMines:
+            self.mark_mine(mine)
+        for safe in newSafes:
+            self.mark_safe(safe)
+
+        # add new sentences to the AI's knowledge based on any of the sentences
+        newKnowledge = []
+        for sentence1 in self.knowledge:
+            for sentence2 in self.knowledge:
+                if sentence1 != sentence2 and sentence1.cells.issubset(sentence2.cells):
+                    newCells = sentence2.cells - sentence1.cells
+                    newCount = sentence2.count - sentence1.count
+                    newKnowledge.append(Sentence(newCells, newCount))
+
+        for sentence in newKnowledge:
+            if sentence not in self.knowledge:
+                self.knowledge.append(sentence)
+
+        # remove empty sentences
+        emptySentences = []
+        for sentence in self.knowledge:
+            if len(sentence.cells) == 0:
+                emptySentences.append(sentence)
+
+        for sentence in emptySentences:
+            self.knowledge.remove(sentence)
 
     def make_safe_move(self):
         """
